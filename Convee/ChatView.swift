@@ -10,137 +10,118 @@ struct ChatView: View {
     @State var newMessage: String = ""
     @State private var showTranslationOverlay: Bool = false
     @State private var currentTranslation: String = ""
+    @State private var currentWordTranslated: String = ""
 
 
 
     var body: some View {
-        VStack {
-            // Context at the top
-            Text(context.description)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading) // Align context to the leading edge
+         VStack {
+             // Context at the top
+             Text(context.description)
+                 .padding()
+                 .frame(maxWidth: .infinity, alignment: .leading) // Align context to the leading edge
+             if !currentTranslation.isEmpty {
+                 HStack {
+                     Spacer() // This pushes the text to the center
+                     Text("\(currentWordTranslated) → \(currentTranslation)")
+                         .padding()
+                         .cornerRadius(8)
+                     Spacer() // This ensures the background spans the full width
+                 }
+                 .frame(maxWidth: .infinity)
+                 .padding(.horizontal)
+                 .background(Color.yellow.opacity(0.3))
+             }
+             // Chat messages in a scrollable view with auto-scroll to bottom
+             ScrollViewReader { proxy in
+                 ScrollView {
+                     VStack(alignment: .leading, spacing: 10) {
+                         ForEach(messages) { message in
+                             HStack {
+                                 Spacer()
+                                 VStack(alignment: .trailing) {
+                                     if let userMessage = message.userMessage, !userMessage.isEmpty {
+                                         Text(userMessage)
+                                             .padding()
+                                             .background(Color.blue.opacity(0.3))
+                                             .cornerRadius(10)
+                                             .frame(maxWidth: 350, alignment: .trailing)
+                                             .foregroundColor(.primary)
+                                     }
+                                     if let correctedUserMessage = message.correctedUserMessage, !correctedUserMessage.isEmpty {
+                                         WordWrappingView(words: correctedUserMessage, maxWidth: 300, onWordTap: { wordIndex in
+                                             // Display the translation of the tapped word
+                                             if let translationArray = message.correctedUserMessageTranslation, wordIndex < translationArray.count {
+                                                 currentTranslation = translationArray[wordIndex]
+                                                 currentWordTranslated = correctedUserMessage[wordIndex]
+                                             }
+                                         })
+                                         .background(Color.green.opacity(0.1))
+                                         .cornerRadius(5)
+                                     }
+                                 }
+                                 .padding(.vertical)
+                             }
 
-            // Chat messages in a scrollable view with auto-scroll to bottom
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(messages) { message in
-                            HStack {
-                                Spacer()
-                                VStack(alignment: .trailing) {
-                                    if let userMessage = message.userMessage, !userMessage.isEmpty {
-                                        Text(userMessage)
-                                            .padding()
-                                            .background(Color.blue.opacity(0.3))
-                                            .cornerRadius(10)
-                                            .frame(maxWidth: 300, alignment: .trailing)
-                                            .foregroundColor(.primary)
-                                    }
-                                    if let correctedUserMessage = message.correctedUserMessage, !correctedUserMessage.isEmpty {
-                                        HStack {
-                                            ForEach(correctedUserMessage.indices, id: \.self) { index in
-                                                Text(correctedUserMessage[index])
-                                                    .foregroundColor(.green)
-                                                    .onTapGesture {
-                                                        currentTranslation = message.correctedUserMessageTranslation?[index] ?? ""
-                                                        showTranslationOverlay.toggle()
-                                                    }
-                                                    .lineLimit(nil) // Allows multiline text
-                                                    .frame(maxWidth: .infinity, alignment: .leading) // Sets max width and aligns to the leading edge
-                                            }
-                                        }
-                                        .padding()
-                                        .background(Color.green.opacity(0.1))
-                                        .cornerRadius(5)
-                                        .frame(maxWidth: 300, alignment: .leading) // Sets the container to a max width with leading alignment
-                                    }
-                                }
-                                .padding(.vertical)
-                            }
+                             HStack {
+                                 VStack(alignment: .leading) {
+                                     if let reply = message.displayReply, !reply.isEmpty {
+                                         Text(reply)
+                                             .padding()
+                                             .background(Color.gray.opacity(0.2))
+                                             .cornerRadius(10)
+                                             .frame(maxWidth: 300, alignment: .leading)
+                                             .foregroundColor(.primary)
+                                     }
+                                     if let replyTranslation = message.displayReplyTranslation, !replyTranslation.isEmpty {
+                                         Text(replyTranslation)
+                                             .font(.footnote)
+                                             .foregroundColor(.secondary)
+                                     }
+                                 }
+                                 .padding(.vertical)
+                                 Spacer()
+                             }
+                             .id(message.id) // Set the ID to the message
+                         }
+                     }
+                     .padding(.horizontal)
+                 }
+                 .onChange(of: messages) { _ in
+                     withAnimation {
+                         proxy.scrollTo(messages.last?.id, anchor: .bottom)
+                     }
+                 }
+             }
 
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    if let reply = message.displayReply, !reply.isEmpty {
-                                        Text(reply)
-                                            .padding()
-                                            .background(Color.gray.opacity(0.2))
-                                            .cornerRadius(10)
-                                            .frame(maxWidth: 300, alignment: .leading)
-                                            .foregroundColor(.primary)
-                                    }
-                                    if let replyTranslation = message.displayReplyTranslation, !replyTranslation.isEmpty {
-                                        Text(replyTranslation)
-                                            .font(.footnote)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.vertical)
-                                Spacer()
-                            }
-                            .id(message.id) // Set the ID to the message
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                .onChange(of: messages) { _ in
-                    withAnimation {
-                        proxy.scrollTo(messages.last?.id, anchor: .bottom)
-                    }
-                }
-            }
+             // Input area with send button at the bottom
+             HStack {
+                 TextEditor(text: $newMessage)
+                     .frame(minHeight: 40, maxHeight: 100)
+                     .padding(5)
+                     .background(Color(UIColor.systemGray6))
+                     .cornerRadius(10)
+                     .overlay(
+                         RoundedRectangle(cornerRadius: 10)
+                             .stroke(Color.secondary, lineWidth: 1)
+                     )
+                     .padding(.horizontal)
 
-            // Input area with send button at the bottom
-            HStack {
-                TextEditor(text: $newMessage)
-                    .frame(minHeight: 40, maxHeight: 100)
-                    .padding(5)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.secondary, lineWidth: 1)
-                    )
-                    .padding(.horizontal)
-
-                Button(action: sendMessage) {
-                    Text("Send")
-                        .padding(.horizontal)
-                        .padding(.vertical, 10)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.trailing)
-            }
-            .padding(.bottom)
-        }
-        .background(Color(UIColor.systemBackground))
-        .onAppear(perform: { initializeChat() })
-        .overlay(
-            VStack {
-                if showTranslationOverlay {
-                    VStack {
-                        Text(currentTranslation)
-                            .padding()
-                            .background(Color(UIColor.systemBackground))
-                            .cornerRadius(8)
-                            .shadow(radius: 10)
-                            .onTapGesture {
-                                showTranslationOverlay = false
-                            }
-                            .padding(20)
-                    }
-                    .padding()
-                    .cornerRadius(10)
-                }
-            }
-            .alignmentGuide(.top) { d in
-                d[.top] + 50
-            }
-            .padding(.top, 50),
-            alignment: .center
-        )
-    }
+                 Button(action: sendMessage) {
+                     Text("Send")
+                         .padding(.horizontal)
+                         .padding(.vertical, 10)
+                         .background(Color.blue)
+                         .foregroundColor(.white)
+                         .cornerRadius(10)
+                 }
+                 .padding(.trailing)
+             }
+             .padding(.bottom)
+         }
+         .background(Color(UIColor.systemBackground))
+         .onAppear(perform: { initializeChat() })
+     }
 
     func initializeChat() {
         let initialPrompt = createInitialPrompt(targetLanguage: targetLanguage, context: context, startingLanguage: startingLanguage)
@@ -199,6 +180,7 @@ struct ChatView: View {
                 // Update chat message with corrected message and reply
                 newChatMessage.reply = reply
                 newChatMessage.correctedUserMessage = corrected
+                chatGPTmessages.append(["role": "assistant", "content": newChatMessage.displayReply ?? ""])
                 self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                 
                 // Step 2: Translate corrected user message
