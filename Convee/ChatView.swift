@@ -19,20 +19,23 @@ struct ChatView: View {
              // Context at the top
              Text(context.description)
                  .padding()
-                 .frame(maxWidth: .infinity, alignment: .leading) // Align context to the leading edge
+                 .frame(maxWidth: .infinity, alignment: .leading) 
+                 .textSelection(.enabled)
+
              if !currentTranslation.isEmpty {
                  HStack {
-                     Spacer() // This pushes the text to the center
+                     Spacer()
                      Text("\(currentWordTranslated) → \(currentTranslation)")
                          .padding()
                          .cornerRadius(8)
-                     Spacer() // This ensures the background spans the full width
+                         .textSelection(.enabled)
+                     Spacer()
                  }
                  .frame(maxWidth: .infinity)
                  .padding(.horizontal)
                  .background(Color.yellow.opacity(0.3))
              }
-             // Chat messages in a scrollable view with auto-scroll to bottom
+
              ScrollViewReader { proxy in
                  ScrollView {
                      VStack(alignment: .leading, spacing: 10) {
@@ -47,13 +50,18 @@ struct ChatView: View {
                                              .cornerRadius(10)
                                              .frame(maxWidth: 350, alignment: .trailing)
                                              .foregroundColor(.primary)
+                                             .textSelection(.enabled)
+
                                      }
                                      if let correctedUserMessage = message.correctedUserMessage, !correctedUserMessage.isEmpty {
-                                         WordWrappingView(words: correctedUserMessage, maxWidth: 300, onWordTap: { wordIndex in
+                                         WordWrappingView(words: correctedUserMessage, originalWords: message.userMessage?.components(separatedBy: " ") ?? [], maxWidth: 300, onWordTap: { wordIndex in
+                                             // Get the word at the tapped index
+                                             let tappedWord = correctedUserMessage[wordIndex]
+                                             
                                              // Display the translation of the tapped word
-                                             if let translationArray = message.correctedUserMessageTranslation, wordIndex < translationArray.count {
-                                                 currentTranslation = translationArray[wordIndex]
-                                                 currentWordTranslated = correctedUserMessage[wordIndex]
+                                             if let translationDictionary = message.correctedUserMessageTranslation {
+                                                 currentWordTranslated = tappedWord
+                                                 currentTranslation = translationDictionary[tappedWord] ?? "No translation available"
                                              }
                                          })
                                          .background(Color.green.opacity(0.1))
@@ -72,17 +80,21 @@ struct ChatView: View {
                                              .cornerRadius(10)
                                              .frame(maxWidth: 300, alignment: .leading)
                                              .foregroundColor(.primary)
+                                             .textSelection(.enabled)
+
                                      }
                                      if let replyTranslation = message.displayReplyTranslation, !replyTranslation.isEmpty {
                                          Text(replyTranslation)
                                              .font(.footnote)
                                              .foregroundColor(.secondary)
+                                             .textSelection(.enabled)
+
                                      }
                                  }
                                  .padding(.vertical)
                                  Spacer()
                              }
-                             .id(message.id) // Set the ID to the message
+                             .id(message.id)
                          }
                      }
                      .padding(.horizontal)
@@ -94,7 +106,6 @@ struct ChatView: View {
                  }
              }
 
-             // Input area with send button at the bottom
              HStack {
                  TextEditor(text: $newMessage)
                      .frame(minHeight: 40, maxHeight: 100)
@@ -139,7 +150,6 @@ struct ChatView: View {
                 
                 self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                 
-                // Now proceed to translate the reply
                 translateArray(targetLanguage: self.targetLanguage, startingLanguage: self.startingLanguage, array: translationArray) { result in
                     switch result {
                     case .success(let translationArray):
@@ -148,7 +158,6 @@ struct ChatView: View {
                         print("Error occurred while translating array: \(error.localizedDescription)")
                     }
                     
-                    // Final update after translating
                     self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                 }
                 
@@ -177,13 +186,11 @@ struct ChatView: View {
                     return
                 }
                 
-                // Update chat message with corrected message and reply
                 newChatMessage.reply = reply
                 newChatMessage.correctedUserMessage = corrected
                 chatGPTmessages.append(["role": "assistant", "content": newChatMessage.displayReply ?? ""])
                 self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                 
-                // Step 2: Translate corrected user message
                 if let correctedMessage = newChatMessage.correctedUserMessage {
                     translateArray(targetLanguage: self.targetLanguage, startingLanguage: self.startingLanguage, array: correctedMessage) { result in
                         switch result {
@@ -194,7 +201,6 @@ struct ChatView: View {
                             print("Failed to translate corrected message array: \(error.localizedDescription)")
                         }
                         
-                        // Step 3: Translate the reply
                         if let replyChatMessage = newChatMessage.reply {
                             translateArray(targetLanguage: self.targetLanguage, startingLanguage: self.startingLanguage, array: replyChatMessage) { result in
                                 switch result {
@@ -232,16 +238,16 @@ struct ChatView: View {
         ChatMessage(
             userMessage: "Hello, I'd like to order a drink.",
             correctedUserMessage:["Hei,", "haluaisin", "tilata", "juoman."],
-            correctedUserMessageTranslation: ["Hello,", "I would like", "to order", "a drink."],
+            correctedUserMessageTranslation: ["Hei,":"Hello,", "haluaisin":"I would like","tilata":"to order", "juoman.":"a drink."],
             reply: ["Totta,", "mitä", "haluaisit", "ottaa?"],
-            replyTranslation: ["Sure,", "what", "would you like", "to have?"]
+            replyTranslation: ["Totta,":"Sure,","mitä": "what", "haluaisit":"would you like", "ottaa?":"to have?"]
         ),
         ChatMessage(
             userMessage: "What options do you have?",
             correctedUserMessage: ["Mitä", "vaihtoehtoja", "sinulla", "on?"],
-            correctedUserMessageTranslation: ["What", "options", "you have", "are?"],
+            correctedUserMessageTranslation: ["Mitä":"What", "vaihtoehtoja":"options", "sinulla":"you have", "on?":"are?"],
             reply:  ["Meillä", "on", "olutta,", "viiniä", "ja", "cocktaileja."],
-            replyTranslation:["We have", "beer,", "wine,", "and", "cocktails."]
+            replyTranslation:["Meillä":"We have", "on":"beer,", "viiniä":"wine,", "ja":"and", "cocktaileja.":"cocktails."]
         )
     ]
     
@@ -253,6 +259,6 @@ struct ChatView: View {
         )),
         targetLanguage: .constant("Finnish"),
         startingLanguage: .constant("English"),
-        messages: sampleMessages // Pass the sample messages here
+        messages: sampleMessages 
     )
 }
