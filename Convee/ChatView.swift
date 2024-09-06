@@ -16,11 +16,43 @@ struct ChatView: View {
 
     var body: some View {
          VStack {
+             HStack {
+      
+
+                 Button(action: {
+                     // Reset messages and reset the chosen context
+                     backToContextSelection()
+                 }) {
+                     Text("Back")
+                         .padding(.vertical, 8) // Reduced padding
+                         .padding(.horizontal, 16) // Horizontal padding for a wider button
+                         .foregroundColor(.red)
+                         .cornerRadius(8)
+                 }
+                 
+                 Spacer()
+                 
+                 Button(action: {
+                     // Reset messages and restart the chat
+                     restartChat()
+                 }) {
+                     Text("Restart")
+                         .padding(.vertical, 8) // Reduced padding
+                         .padding(.horizontal, 16) // Horizontal padding for a wider button
+                         .cornerRadius(8)
+                 }
+
+             }
+             .padding(.horizontal)
+             
+             Divider() // Line between buttons and context
+
              // Context at the top
              Text(context.description)
                  .padding()
                  .frame(maxWidth: .infinity, alignment: .leading) 
                  .textSelection(.enabled)
+             Divider()
 
              if !currentTranslation.isEmpty {
                  HStack {
@@ -228,7 +260,17 @@ struct ChatView: View {
             messages.append(chatMessage)
         }
     }
+    func restartChat() {
+         messages.removeAll()
+         chatGPTmessages.removeAll()
+         initializeChat()
+     }
 
+     func backToContextSelection() {
+         messages.removeAll()
+         chatGPTmessages.removeAll()
+         context = Context(description: "", partnerPortrait: nil, startingMessage: "")
+     }
 }
 
 

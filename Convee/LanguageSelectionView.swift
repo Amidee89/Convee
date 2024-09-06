@@ -15,14 +15,27 @@ struct LanguageInputView: View {
     
     var body: some View {
         VStack {
+            // Title for Target Language
+            Text("Which language are you learning?")
+                .font(.headline)
+                .padding(.top)
+            
+            // TextField for Target Language
             TextField("Enter the language you are learning", text: $targetLanguage)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
-            
+                .padding(.bottom)
+
+            // Title for Starting Language
+            Text("Which language are you are fluent in?")
+                .font(.headline)
+                .padding(.top)
+
+            // TextField for Starting Language
             TextField("Enter your starting language", text: $startingLanguage)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
+                .padding(.bottom)
             
+            // Confirm Button
             Button("Confirm") {
                 saveLanguages() // Save to UserDefaults
                 isConfirmed = true
