@@ -10,6 +10,7 @@ import Foundation
 func createInitialPrompt(targetLanguage: String, context: Context, startingLanguage: String) -> String {
     let initialPrompt = """
     You are a \(targetLanguage) language coach doing roleplay with me. The context is: \(context.description). I will try to talk to you in \(targetLanguage) and you will be replying in \(targetLanguage). I will put words that I don’t know in \(startingLanguage) in my part of the roleplay. You will answer with a JSON containing a dictionary of arrays. The dictionary is formed as such:
+    "split": (list) my message, in a list split word by word
     “corrected”: (list) my message, corrected by you retaining the meaning but fixing mistakes or translating missing words, in a list word by word
     “reply”: (list) your response to the message, in \(targetLanguage), in a list word by word
     Continue the conversation given the context and keep it short and natural, one to two sentences maximum using spoken language style adequate for the setting. Always make sure your reply will always require an answer from the user, except when the user clearly shows interest to close the conversation. Do not stray at all from the context. Do not answer questions that do not fit the language coaching context. If you feel the reply is not in roleplay and makes no sense in the context, the json shall contain just {“error”:“conversation strayed from context”}
@@ -26,7 +27,7 @@ func createTranslateArrayFromEnglishSystemPrompt(targetLanguage: String) -> Stri
     return translateSystemPrompt
 }
 
-func createTranslateInitalMessagePrompt (targetLanguage: String, context: Context) -> String {
+func createTranslateInitalMessageFromEnglishPrompt (targetLanguage: String, context: Context) -> String {
     let translateInitalMessagePrompt = """
 Translate this sentence: "\(context.startingMessage)" in \(targetLanguage). This is the first sentence in a conversation in this context: \(context.description)."
 """
@@ -35,7 +36,7 @@ Translate this sentence: "\(context.startingMessage)" in \(targetLanguage). This
 
 func createTranslateArraySystemPrompt (targetLanguage: String, startingLanguage: String) -> String {
     let translateWordArraySystemPrompt = """
-    You are a helpful assistant, ready to make accurate translations from \(targetLanguage) to \(startingLanguage). You will answer with a JSON containing a dictionary containing the translation of the each of the words you're given in \(targetLanguage). Be super careful to give a translation for each of the words. Keep the translation accurate to the context of the sentence, that is being the list of words you're given when read in order.
+    You are a helpful assistant, ready to make accurate translations from \(targetLanguage) to \(startingLanguage). You will answer with a JSON containing a dictionary containing the translation of the each of the words you're given in \(targetLanguage). Be super careful to give a translation for each of the words. Keep the translation accurate to the context of the sentence, that is being the list of words you're given when read in order. So for every word, you give out "\(targetLanguage) word":"\(startingLanguage) translation", keeping the translation meaningful in the context of the sentence you're given as a list of words.
     """
        return translateWordArraySystemPrompt
 }
@@ -43,14 +44,14 @@ func createTranslateArraySystemPrompt (targetLanguage: String, startingLanguage:
 func createTranslateArrayPrompt (translationArray: [String]) -> String {
         let translateWordArrayPrompt =
             """
-            Translate this list of words: \(translationArray)
+            Translate this sentence given as a list of words: \(translationArray)
             """
         return translateWordArrayPrompt
     }
 
 func translateInitialMessage(context: Context, targetLanguage: String, startingLanguage: String, completion: @escaping (Result<[String], Error>) -> Void) {
     let translateInitialMessageSystemPrompt = createTranslateArrayFromEnglishSystemPrompt(targetLanguage: targetLanguage)
-    let translateInitialMessagePrompt = createTranslateInitalMessagePrompt(targetLanguage: targetLanguage, context: context)
+    let translateInitialMessagePrompt = createTranslateInitalMessageFromEnglishPrompt(targetLanguage: targetLanguage, context: context)
     
     var translateMessages = [["role": "system", "content": translateInitialMessageSystemPrompt]]
     translateMessages.append(["role": "user", "content": translateInitialMessagePrompt])
@@ -109,7 +110,7 @@ func makeChatGPTRequest(with messages: [[String: String]], completion: @escaping
     let parameters: [String: Any] = [
         "model": "gpt-4o",
         "messages": messages,
-        "temperature": 0.3,
+        "temperature": 0.1,
         "response_format": ["type": "json_object"]
     ]
 

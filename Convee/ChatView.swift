@@ -11,7 +11,8 @@ struct ChatView: View {
     @State private var showTranslationOverlay: Bool = false
     @State private var currentTranslation: String = ""
     @State private var currentWordTranslated: String = ""
-
+    @State private var showErrorOverlay: Bool = false
+    @State private var errorMessage: String = ""
 
 
     var body: some View {
@@ -53,8 +54,21 @@ struct ChatView: View {
                  .frame(maxWidth: .infinity, alignment: .leading) 
                  .textSelection(.enabled)
              Divider()
-
-             if !currentTranslation.isEmpty {
+             if showErrorOverlay {
+                     HStack {
+                         Spacer()
+                         Text("Error: \(errorMessage)")
+                             .padding()
+                             .cornerRadius(8)
+                             .foregroundColor(.red)
+                             .textSelection(.enabled)
+                         Spacer()
+                     }
+                     .frame(maxWidth: .infinity)
+                     .padding(.horizontal)
+                     .background(Color.red.opacity(0.3))
+                 }
+            else if !currentTranslation.isEmpty {
                  HStack {
                      Spacer()
                      Text("\(currentWordTranslated) → \(currentTranslation)")
@@ -86,7 +100,9 @@ struct ChatView: View {
 
                                      }
                                      if let correctedUserMessage = message.correctedUserMessage, !correctedUserMessage.isEmpty {
-                                         WordWrappingView(words: correctedUserMessage, originalWords: message.userMessage?.components(separatedBy: " ") ?? [], maxWidth: 300, onWordTap: { wordIndex in
+                                         let originalWords = message.splitUserMessage ?? message.userMessage?.components(separatedBy: " ") ?? []
+
+                                         WordWrappingView(words: correctedUserMessage, originalWords: originalWords, maxWidth: 250, onWordTap: { wordIndex in
                                              // Get the word at the tapped index
                                              let tappedWord = correctedUserMessage[wordIndex]
                                              
@@ -188,6 +204,8 @@ struct ChatView: View {
                         newChatMessage.replyTranslation = translationArray
                     case .failure(let error):
                         print("Error occurred while translating array: \(error.localizedDescription)")
+                        showErrorMessage("Translation error")
+
                     }
                     
                     self.updateOrAppendChatMessage(chatMessage: newChatMessage)
@@ -195,6 +213,7 @@ struct ChatView: View {
                 
             case .failure(let error):
                 print("Error occurred: \(error.localizedDescription)")
+                showErrorMessage("Conversation start response was not valid")
             }
         }
     }
@@ -205,7 +224,8 @@ struct ChatView: View {
 
         var newChatMessage = ChatMessage(userMessage: newMessage, correctedUserMessage: nil, correctedUserMessageTranslation: nil, reply: nil, replyTranslation: nil)
         messages.append(newChatMessage)
-        chatGPTmessages.append(["role": "user", "content": newMessage])
+        let sentMessage = newMessage  // Save the current message content
+        self.chatGPTmessages.append(["role": "user", "content": newMessage])
         newMessage = ""
 
         // Step 1: Make ChatGPT request
@@ -215,11 +235,17 @@ struct ChatView: View {
                 guard let corrected = json["corrected"] as? [String],
                       let reply = json["reply"] as? [String] else {
                     print("Error parsing response")
+                    showErrorMessage("Response was not valid")
+                    restoreMessageInput(sentMessage)
+                    chatGPTmessages.removeLast()
                     return
                 }
                 
                 newChatMessage.reply = reply
                 newChatMessage.correctedUserMessage = corrected
+                if let splitMessage = json["split"] as? [String]{
+                    newChatMessage.splitUserMessage = splitMessage
+                }
                 chatGPTmessages.append(["role": "assistant", "content": newChatMessage.displayReply ?? ""])
                 self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                 
@@ -231,6 +257,9 @@ struct ChatView: View {
                             self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                         case .failure(let error):
                             print("Failed to translate corrected message array: \(error.localizedDescription)")
+                            showErrorMessage("\(error.localizedDescription)")
+                            restoreMessageInput(sentMessage)
+                            chatGPTmessages.removeLast(2)
                         }
                         
                         if let replyChatMessage = newChatMessage.reply {
@@ -241,6 +270,9 @@ struct ChatView: View {
                                     self.updateOrAppendChatMessage(chatMessage: newChatMessage)
                                 case .failure(let error):
                                     print("Failed to translate reply message array: \(error.localizedDescription)")
+                                    showErrorMessage("\(error.localizedDescription)")
+                                    restoreMessageInput(sentMessage)
+                                    chatGPTmessages.removeLast(2)
                                 }
                             }
                         }
@@ -249,7 +281,11 @@ struct ChatView: View {
                 
             case .failure(let error):
                 print("Failed to get a response from ChatGPT: \(error)")
+                showErrorMessage("\(error.localizedDescription)")
+                restoreMessageInput(sentMessage)
+                chatGPTmessages.removeLast(2)
             }
+            resetErrorMessage()
         }
     }
 
@@ -271,6 +307,18 @@ struct ChatView: View {
          chatGPTmessages.removeAll()
          context = Context(description: "", partnerPortrait: nil, startingMessage: "")
      }
+    func showErrorMessage(_ message: String) {
+        errorMessage = message
+        showErrorOverlay = true
+    }
+    func resetErrorMessage () {
+        showErrorOverlay = false
+    }
+    
+    func restoreMessageInput(_ message: String) {
+        newMessage = message  // Restore the original message content
+        messages.removeLast()
+    }
 }
 
 
@@ -279,6 +327,7 @@ struct ChatView: View {
     let sampleMessages = [
         ChatMessage(
             userMessage: "Hello, I'd like to order a drink.",
+            splitUserMessage: ["Hello,", "I'd", "like", "to", "order", "a", "drink."],
             correctedUserMessage:["Hei,", "haluaisin", "tilata", "juoman."],
             correctedUserMessageTranslation: ["Hei,":"Hello,", "haluaisin":"I would like","tilata":"to order", "juoman.":"a drink."],
             reply: ["Totta,", "mitä", "haluaisit", "ottaa?"],

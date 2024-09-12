@@ -11,7 +11,9 @@ import SwiftUI
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
     var userMessage: String?
+    var splitUserMessage: [String]?
     var correctedUserMessage: [String]?
+    var splitOriginalMessage: [String]?
     var correctedUserMessageTranslation: [String: String]? // Dictionary for word-by-word translation
     var reply: [String]?
     var replyTranslation: [String: String]? // Dictionary for word-by-word translation
